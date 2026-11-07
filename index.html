@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#163b30">
+  <title>Garden Bloom AR | Interactive Nature Garden</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Load the 3D and marker-tracking libraries before starting the scene. -->
+  <script defer src="js/load-libraries.js"></script>
+</head>
+<body>
+  <!-- Start the AR scene after camera permission is requested. -->
+  <div id="scene-mount"></div>
+  <!-- Video backdrop uses the camera stream managed by AR.js. -->
+  <video id="camera-backdrop" muted autoplay playsinline webkit-playsinline aria-hidden="true"></video>
+  <div id="camera-shade" aria-hidden="true"></div>
+
+  <header id="topbar">
+    <div class="brand"><span class="brand-flower">✿</span> GARDEN BLOOM <span class="brand-light">/ LIVE AR</span></div>
+    <div id="camera-state" class="state">Camera not started</div>
+  </header>
+  <div id="marker-status" class="marker-status lost" role="status" aria-live="polite">Show the Hiro marker to explore the garden</div>
+
+  <section id="intro" class="intro">
+    <div class="intro-card">
+      <div class="intro-icon">🌸 <span>🦋</span></div>
+      <p class="eyebrow">INTERACTIVE AUGMENTED REALITY</p>
+      <h1>A little garden,<br><em>alive in your world.</em></h1>
+      <p>Bloom a flower. Make it rain. Light up a firefly. Everything grows right on your Hiro marker.</p>
+      <button type="button" id="start-ar" class="start-btn" disabled>⏳ Loading AR libraries...</button>
+      <p class="fineprint">Loading A-Frame and AR.js... The Start button will become ready once both libraries load.</p>
+      <div class="intro-links"><a href="markers/print-hiro.html" target="_blank" rel="noopener">Get Hiro marker</a><span>·</span><a href="camera-test.html">Test camera</a><span>·</span><a href="preview.html">3D preview (no camera)</a></div>
+    </div>
+  </section>
+
+  <section id="garden-controls" class="garden-controls" hidden>
+    <div class="controls-heading"><strong>THE LITTLE GARDEN</strong><span id="feedback">Point at the Hiro marker and try an activity.</span></div>
+    <div class="activity-grid" aria-label="Garden interactions">
+      <button class="activity" type="button" data-action="bloom"><span class="emoji">🌷</span><span><strong>Bloom</strong><small>Open a flower</small></span></button>
+      <button class="activity" type="button" data-action="water"><span class="emoji">💧</span><span><strong>Rain</strong><small>Grow the garden</small></span></button>
+      <button class="activity" type="button" data-action="glow"><span class="emoji">✨</span><span><strong>Firefly</strong><small>Change its glow</small></span></button>
+    </div>
+    <div class="controls-footer"><button type="button" id="camera-retry">↻ Restart camera</button><button type="button" id="toggle-details">Camera details</button></div>
+  </section>
+  <pre id="camera-details" class="camera-details" hidden>Camera is waiting to start.</pre>
+
+  <template id="scene-template">
+    <a-scene id="garden-scene" embedded vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false"
+      renderer="antialias: true; alpha: true; precision: medium; colorManagement: true"
+      background="transparent: true"
+      arjs="sourceType: webcam; videoTexture: false; debugUIEnabled: false; detectionMode: mono_and_matrix; cameraParametersUrl: vendor/camera_para.dat;">
+      <a-assets timeout="20000">
+        <!-- Butterfly glTF model, supplied with the project. -->
+        <a-asset-item id="butterfly-model" src="models/butterfly.glb"></a-asset-item>
+      </a-assets>
+      <a-marker id="hiro-marker" type="pattern" url="markers/pattern-hiro.patt" emitevents="true" marker-banner smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="2">
+        <!-- Garden stage (primitives: cylinder, torus, plane, box, spheres, cones). -->
+        <a-cylinder position="0 .015 0" radius=".82" height=".055" color="#285c43"></a-cylinder>
+        <a-cylinder position="0 .051 0" radius=".77" height=".03" color="#4e9e63"></a-cylinder>
+        <a-torus position="0 .075 0" rotation="-90 0 0" radius=".75" radius-tubular=".027" color="#f5d4a3"></a-torus>
+        <a-plane position="0 .068 0" rotation="-90 0 0" width=".29" height="1.15" color="#e7cda3" opacity=".70" material="transparent: true"></a-plane>
+
+        <!-- Patches of grass, bushes and tiny plants. -->
+        <a-cone position="-.71 .13 -.15" radius-bottom=".09" height=".20" color="#3c874f"></a-cone>
+        <a-cone position="-.67 .13 .28" radius-bottom=".09" height=".20" color="#297448"></a-cone>
+        <a-cone position=".68 .13 -.11" radius-bottom=".09" height=".20" color="#2c854e"></a-cone>
+        <a-cone position=".64 .13 .39" radius-bottom=".09" height=".20" color="#398c58"></a-cone>
+        <a-cone position="-.24 .13 .64" radius-bottom=".06" height=".16" color="#8abf63"></a-cone>
+        <a-cone position=".17 .11 -.69" radius-bottom=".055" height=".14" color="#91c467"></a-cone>
+        <a-sphere position="-.54 .11 -.45" radius=".12" color="#46975e" scale="1 .55 1"></a-sphere>
+        <a-sphere position=".52 .13 -.47" radius=".13" color="#3e865b" scale="1 .65 1"></a-sphere>
+        <a-sphere position="-.25 .12 .51" radius=".05" color="#f7cd8e" scale="1 .48 1"></a-sphere>
+        <a-sphere position=".12 .11 .63" radius=".05" color="#f9d7ae" scale="1 .48 1"></a-sphere>
+
+        <!-- Activity 1: close-to-open bud. The petal hinge rotations are changed by a custom JS component. -->
+        <a-entity id="flower" position="-.42 0 -.08" bloom-toggle>
+          <a-cylinder position="0 .285 0" radius=".025" height=".50" color="#35864e"></a-cylinder>
+          <a-sphere position="-.13 .27 0" radius=".10" color="#509c54" scale="1 .22 .58" rotation="0 0 -24"></a-sphere>
+          <a-sphere position=".13 .22 0" radius=".10" color="#56b05b" scale="1 .23 .58" rotation="0 0 20"></a-sphere>
+          <a-sphere position="0 .52 0" radius=".102" color="#ffe1a0"></a-sphere>
+          <a-sphere class="clickable" position="0 .53 0" radius=".16" color="#f7ca76" material="opacity: .12; transparent: true; depthWrite: false"></a-sphere>
+          <a-entity class="petal-hinge" data-angle="0" position="0 .50 0" rotation="0 0 -9"><a-sphere position=".06 .135 0" radius=".13" scale=".75 1.4 .36" color="#f5a1b9" material="side: double"></a-sphere></a-entity>
+          <a-entity class="petal-hinge" data-angle="60" position="0 .50 0" rotation="0 60 -9"><a-sphere position=".06 .135 0" radius=".13" scale=".75 1.4 .36" color="#f5b0bf"></a-sphere></a-entity>
+          <a-entity class="petal-hinge" data-angle="120" position="0 .50 0" rotation="0 120 -9"><a-sphere position=".06 .135 0" radius=".13" scale=".75 1.4 .36" color="#f3a1bb"></a-sphere></a-entity>
+          <a-entity class="petal-hinge" data-angle="180" position="0 .50 0" rotation="0 180 -9"><a-sphere position=".06 .135 0" radius=".13" scale=".75 1.4 .36" color="#fbd1ce"></a-sphere></a-entity>
+          <a-entity class="petal-hinge" data-angle="240" position="0 .50 0" rotation="0 240 -9"><a-sphere position=".06 .135 0" radius=".13" scale=".75 1.4 .36" color="#f79fb0"></a-sphere></a-entity>
+          <a-entity class="petal-hinge" data-angle="300" position="0 .50 0" rotation="0 300 -9"><a-sphere position=".06 .135 0" radius=".13" scale=".75 1.4 .36" color="#f8b9c3"></a-sphere></a-entity>
+        </a-entity>
+
+        <!-- Activity 2: touch the cloud to animate rain and grow a seedling. -->
+        <a-entity id="cloud" position=".39 .89 -.05" water-garden>
+          <a-sphere class="clickable" position="0 0 0" radius=".18" scale="1.5 .66 .8" color="#d6f4f3" material="roughness: .8"></a-sphere>
+          <a-sphere class="clickable" position="-.115 .055 0" radius=".14" color="#ecfffb"></a-sphere>
+          <a-sphere class="clickable" position=".11 .048 0" radius=".12" color="#c9eced"></a-sphere>
+          <a-sphere class="clickable" position=".012 .10 0" radius=".17" color="#e9fffc"></a-sphere>
+        </a-entity>
+        <a-entity id="rain-system" position=".38 0 -.05"></a-entity>
+        <a-entity id="seedling" position=".39 0 .10">
+          <a-cylinder position="0 .20 0" radius=".018" height=".36" color="#3b9659"></a-cylinder>
+          <a-sphere position="-.07 .24 0" radius=".10" scale="1 .25 .55" color="#55bc67" rotation="0 0 -23"></a-sphere>
+          <a-sphere position=".07 .33 0" radius=".10" scale="1 .25 .55" color="#81cc65" rotation="0 0 20"></a-sphere>
+          <a-cone position="0 .44 0" height=".16" radius-bottom=".085" color="#94d878"></a-cone>
+        </a-entity>
+
+        <!-- Activity 3: tappable ball with colour-changing interaction. -->
+        <a-entity id="firefly-holder" position=".15 0 .45"
+             animation="property: rotation; to: 0 360 0; dur: 11000; easing: linear; loop: true">
+          <a-sphere id="firefly" class="clickable" color-changer position=".24 .54 0" radius=".13"
+             material="color: #ffe788; emissive: #ffc74e; emissiveIntensity: .75; roughness: .25"
+             animation="property: position; from: .24 .50 0; to: .24 .72 0; dir: alternate; dur: 1400; easing: easeInOutSine; loop: true"></a-sphere>
+          <a-torus position=".24 .54 0" rotation="90 0 0" radius=".20" radius-tubular=".013" color="#fbeac0" opacity=".65"></a-torus>
+        </a-entity>
+
+        <!-- Animated butterfly model. -->
+        <a-entity id="butterfly" gltf-model="#butterfly-model" position=".01 .72 -.42" scale=".56 .56 .56"
+          animation="property: position; from: .01 .66 -.42; to: .13 .83 -.31; dir: alternate; dur: 2200; easing: easeInOutSine; loop: true"
+          animation__turn="property: rotation; from: 0 -25 0; to: 0 24 0; dir: alternate; dur: 3200; easing: easeInOutSine; loop: true"></a-entity>
+
+        <!-- User-friendly marker-mounted labels, visible from either side. -->
+        <a-text value="GARDEN BLOOM" position="0 1.20 -.36" align="center" width="2.5" color="#ffffff" side="double"></a-text>
+        <a-text value="TOUCH TO MAKE NATURE GROW" position="0 1.08 -.36" align="center" width="1.62" color="#fce9c0" side="double"></a-text>
+      </a-marker>
+      <a-entity camera cursor="rayOrigin: mouse; fuse: false" raycaster="objects: .clickable; far: 1000; interval: 80"></a-entity>
+    </a-scene>
+  </template>
+</body>
+</html>
